@@ -110,6 +110,10 @@ def load_resnet():
 @st.cache_resource(show_spinner="Loading ViT-B/16…")
 def load_vit():
     model = timm.create_model("vit_base_patch16_224", pretrained=True, num_classes=1000)
+    # Disable fused (scaled_dot_product_attention) attention on the last block
+    # so the attn_drop forward hook receives the attention matrix — required
+    # for the attention map visualization.
+    model.blocks[-1].attn.fused_attn = False
     model.eval()
     model.to(DEVICE)
     return model
@@ -479,6 +483,11 @@ with tab_demo:
                 overlay = (0.5 * img_resized / 255.0 + 0.5 * plt_colorize(attn_resized))
                 overlay = np.clip(overlay, 0, 1)
                 st.image(overlay, width='stretch')
+        else:
+            st.warning(
+                "Attention map could not be extracted from this model build. "
+                "Predictions above are unaffected."
+            )
     else:
         st.info(
             "Upload any image above to run inference with both models. "
