@@ -110,10 +110,11 @@ def load_resnet():
 @st.cache_resource(show_spinner="Loading ViT-B/16…")
 def load_vit():
     model = timm.create_model("vit_base_patch16_224", pretrained=True, num_classes=1000)
-    # Disable fused (scaled_dot_product_attention) attention on the last block
-    # so the attn_drop forward hook receives the attention matrix — required
-    # for the attention map visualization.
-    model.blocks[-1].attn.fused_attn = False
+    # Disable fused (scaled_dot_product_attention) attention so the attn_drop
+    # forward hooks receive the attention matrices — required for the
+    # attention rollout visualization (needs all 12 blocks).
+    for block in model.blocks:
+        block.attn.fused_attn = False
     model.eval()
     model.to(DEVICE)
     return model
@@ -169,8 +170,11 @@ def predict(model, tensor: torch.Tensor, top_k: int = 5):
 
 def get_vit_attention_map(model, tensor: torch.Tensor) -> np.ndarray:
     """
-    Extract mean attention from the last transformer block's [CLS] token
-    and reshape to a 14×14 spatial map.
+    Attention rollout (Abnar & Zuidema, 2020): propagate attention through
+    all transformer blocks instead of reading a single layer. This avoids
+    the last-layer artifact where attention collapses onto a few
+    uninformative background patches.
+    Returns a 14×14 map of how much the [CLS] token attends to each patch.
     """
     attentions = []
 
@@ -178,9 +182,10 @@ def get_vit_attention_map(model, tensor: torch.Tensor) -> np.ndarray:
         # output shape: (B, num_heads, seq_len, seq_len)
         attentions.append(output.detach().cpu())
 
-    handles = []
-    for block in model.blocks[-1:]:
-        handles.append(block.attn.attn_drop.register_forward_hook(hook_fn))
+    handles = [
+        block.attn.attn_drop.register_forward_hook(hook_fn)
+        for block in model.blocks
+    ]
 
     try:
         with torch.no_grad():
@@ -192,11 +197,15 @@ def get_vit_attention_map(model, tensor: torch.Tensor) -> np.ndarray:
     if not attentions:
         return None
 
-    attn = attentions[0][0]  # (num_heads, seq_len, seq_len)
-    # CLS token attends to all patches → row 0, columns 1:
-    cls_attn = attn[:, 0, 1:]          # (num_heads, 196)
-    cls_attn = cls_attn.mean(0)        # (196,)
-    cls_attn = cls_attn.reshape(14, 14).numpy()
+    seq_len = attentions[0].shape[-1]
+    rollout = torch.eye(seq_len)
+    for layer_attn in attentions:
+        attn = layer_attn[0].mean(0)               # average heads → (197, 197)
+        attn = attn + torch.eye(seq_len)           # add residual connection
+        attn = attn / attn.sum(dim=-1, keepdim=True)
+        rollout = attn @ rollout
+
+    cls_attn = rollout[0, 1:].reshape(14, 14).numpy()
     cls_attn = (cls_attn - cls_attn.min()) / (cls_attn.max() - cls_attn.min() + 1e-8)
     return cls_attn
 
