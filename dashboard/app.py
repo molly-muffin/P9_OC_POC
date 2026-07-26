@@ -456,9 +456,9 @@ with tab_demo:
         st.divider()
         st.markdown("### ViT Attention Map")
         st.caption(
-            "Self-attention from the [CLS] token in the last transformer block, "
-            "averaged across all 12 attention heads. Brighter zones = regions "
-            "the model focuses on for classification."
+            "Attention rollout (Abnar & Zuidema, 2020): [CLS] token attention "
+            "propagated through all 12 transformer blocks. Brighter zones = "
+            "regions the model focuses on for classification."
         )
 
         attn_map = get_vit_attention_map(vit, tensor)
