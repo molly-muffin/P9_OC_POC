@@ -83,7 +83,7 @@ The Training Results tab requires `results.json` from the notebook.
 5. Set **Main file path** to `dashboard/app.py`
 6. Click **Deploy**
 
-The app will be live at `https://<your-app-name>.streamlit.app`.
+The app is live at [https://p9ocpoc-vy5wnsdfgappjgsdvdez6kc.streamlit.app/](https://p9ocpoc-vy5wnsdfgappjgsdvdez6kc.streamlit.app/).
 
 **Important for deployment**: Model weights (`*.pth` files) are large (hundreds of MB).
 The Live Demo tab uses models downloaded at runtime via `timm` and `torchvision`,
