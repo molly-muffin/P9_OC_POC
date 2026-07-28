@@ -613,14 +613,13 @@ with tab_demo:
 
         attn_map = get_vit_attention_map(vit, tensor)
         if attn_map is not None:
-            import plotly.express as px
-
             img_resized = np.array(image.resize((224, 224)))
             attn_resized = np.array(
                 Image.fromarray((attn_map * 255).astype(np.uint8)).resize(
                     (224, 224), Image.BILINEAR
                 )
             ) / 255.0
+            attn_colored = plt_colorize(attn_resized)
 
             col_a, col_b, col_c = st.columns(3)
             with col_a:
@@ -628,18 +627,10 @@ with tab_demo:
                 st.image(img_resized, width='stretch')
             with col_b:
                 st.markdown("**Attention Map**")
-                fig = px.imshow(attn_resized, color_continuous_scale="viridis")
-                fig.update_layout(
-                    coloraxis_showscale=False,
-                    margin=dict(l=0, r=0, t=0, b=0),
-                    plot_bgcolor="#0f1117",
-                    paper_bgcolor="#0f1117",
-                    height=220,
-                )
-                st.plotly_chart(fig, width='stretch')
+                st.image(attn_colored, width='stretch')
             with col_c:
                 st.markdown("**Overlay**")
-                overlay = (0.5 * img_resized / 255.0 + 0.5 * plt_colorize(attn_resized))
+                overlay = (0.5 * img_resized / 255.0 + 0.5 * attn_colored)
                 overlay = np.clip(overlay, 0, 1)
                 st.image(overlay, width='stretch')
         else:
